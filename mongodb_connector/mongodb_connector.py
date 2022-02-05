@@ -1,3 +1,4 @@
+import re
 from pymongo import MongoClient
 from . lark_sql import MongoSQLParser
 
@@ -24,9 +25,10 @@ class MongoDBCursor():
         self.client.close()
 
     def execute(self, operation, *args):
+        print("execute", operation)
+
         try:
             parsed = self.parser.parse(operation)
-            print("execute", parsed)
             if parsed["statement"] == "select":
                 print("select")
                 collection = parsed["table"]
@@ -42,8 +44,29 @@ class MongoDBCursor():
                 obj = {}
                 for i in range(len(k)):
                     obj[ k[i] ] = v[i]
-                self.cursor = self.client[self.database][collection].insert_many(obj)
+                self.client[self.database][collection].insert_one(obj)
+                self.cursor = None
                 print("insert done.")
+            elif parsed["statement"] == "update":
+                print("update")
+                collection = parsed["table"]
+                self.client[self.database][collection].update_many(parsed["where"],{'$set': parsed["set"]})
+                self.cursor =  None
+                print("update done!!")
+            elif parsed["statement"] == "delete":
+                print("delete")
+                collection = parsed["table"]
+                print("parsed[where]", parsed["where"])
+                # self.client[self.database][collection].delete_many(parsed["where"])
+                # {"name": {"$eq": "Charly"}}
+                self.client[self.database][collection].delete_many({"name": {"$eq": "Charly"}})
+                self.cursor = None
+            elif parsed["statement"] == "create":
+                collection = parsed["table"]
+                self.client[self.database][collection]
+            elif parsed["statement"] == "drop":
+                collection = parsed["table"]
+                self.client[self.database][collection].drop()
             else:
                 raise MongoDBConnectorException("Not implemented")
         except Exception as e:
@@ -53,7 +76,10 @@ class MongoDBCursor():
         pass
 
     def fetchone(self):
-        return self.cursor.next()
+        if self.cursor is not None:
+            return self.cursor.next()
+        else:
+            return None
 
     def fetchmany(self):
         """ Fetch the next set of rows of a query result, returning a sequence of sequences (e.g. a list of tuples). An empty sequence is returned when no more rows are available.
@@ -61,15 +87,23 @@ class MongoDBCursor():
             An Error (or subclass) exception is raised if the previous call to .execute*() did not produce any result set or no call was issued yet.
             Note there are performance considerations involved with the size parameter. For optimal performance, it is usually best to use the .arraysize attribute. If the size parameter is used, then it is best for it to retain the same value from one .fetchmany() call to the next.
         """
-        pass
+        ret = []
+        if self.cursor is not None:
+            for i in range(self.arraysize):
+                try:
+                    ret.append(self.cursor.next())
+                except StopIteration:
+                    break
+        return ret
 
     def fetchall(self):
         """Fetches all (remaining) rows of a query result, returning them as a sequence of sequences (e.g. a list of tuples). Note that the cursor's arraysize attribute can affect the performance of this operation.
             An Error (or subclass) exception is raised if the previous call to .execute*() did not produce any result set or no call was issued yet.
         """
         ret = []
-        for i in self.cursor:
-            ret.append(i)
+        if self.cursor is not None:
+            for i in self.cursor:
+                ret.append(i)
         return ret
 
     def setinputsizes(self, sizes):
@@ -93,9 +127,17 @@ class MongoDBCursor():
 
 
 class MongoDBConnection():
-    def __init__(self,host:str,port:int, user:str=None, password:str=None, database:str=None):
+    def __init__(self,host:str,port:int=None, user:str=None, password:str=None, database:str=None):
         self.host = host
-        self.port = port
+
+        if port is not None:
+            try:
+                self.port = int(port)
+            except Exception as e:
+                raise MongoDBConnectorException("Invalid port number", e)
+        else:
+            self.port = 27017
+
         self.user = user
         self.password = password
         self.database = database
@@ -106,11 +148,12 @@ class MongoDBConnection():
         user_pass =""
         if user is not None:
             user_pass = user + ":" + password + "@"
-        uri = "mongodb://" + user_pass + host + ":" + str(port)
-        
-        
-        self.client = MongoClient(uri)
 
+        uri = "mongodb://" + user_pass + host + ":" + str(port)
+        try:
+            self.client = MongoClient(uri)
+        except Exception as e:
+            raise MongoDBConnectorException("Invalid mongodb connection configuration", e)
     
     def close(self):
         self.client.close()
@@ -126,12 +169,17 @@ class MongoDBConnection():
         return MongoDBCursor(self.client, self.database)
 
 
-def connect(host:str, port:int, user:str=None, password:str=None, database:str=None)->MongoDBConnection:
+
+def connect(uri:str)->MongoDBConnection:
     """Connect to MongoDB
     :param uri: MongoDB URI (e.g. mongodb://user:password@localhost:27017/db)
     :return: MongoDBConnection
     """
-    return MongoDBConnection(host,port,user,password,database)
+    match = re.match(r'^mongodb://((?P<user>.*):(?P<password>.*)@)?(?P<host>.*?)(:(?P<port>[1-9][0-9]*))?/(?P<database>.*)$', uri)
+    d = match.groupdict()
+    return MongoDBConnection(d["host"], int(d["port"]), d["user"], d["password"], d["database"])
+
+
 
 apilevel = 2.0
 threadsafety = 0

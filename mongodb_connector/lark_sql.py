@@ -308,7 +308,7 @@ class SQLTransformer(Transformer):
         ret = {
             "statement": "update",
             "table": parsed[1],
-            "assigns": parsed[3]
+            "set": parsed[3]
         }
 
         if len(parsed) == 5:
@@ -330,7 +330,7 @@ class SQLTransformer(Transformer):
             "table": parsed[2],
         }
         if len(parsed) > 3:
-            ret["where"] = parsed[3]
+            ret["where"] = parsed[3][1]
         print(ret)
         return ret
 
@@ -369,8 +369,10 @@ class SQLTransformer(Transformer):
                 return int(t[0].value)
             elif t[0].type == 'SIGNED_FLOAT':
                 return float(t[0].value)
-            elif t[0].type == 'ESCAPED_STRING':
-                return t[0].value
+            elif t[0].type == 'STRING':
+                s = t[0].value[1:-1]
+                print("STRING", t[0].value, s)
+                return s
             else:
                 return t[0].value
         else:

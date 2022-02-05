@@ -18,10 +18,14 @@ def test_mongodb_connector():
     # print(result)
     # connection.close()
 
-    connection = connect("localhost", 27017, None, None, "testdb")
+    connection = connect("mongodb://localhost:27017/testdb")
     cursor = connection.cursor()
-    # cursor.execute("SELECT * FROM csv WHERE year >= 10")
-    cursor.execute("INSERT INTO csv (name,year) VALUES (\"Mike\",30)")
+
+    cursor.execute("SELECT * FROM csv WHERE year >= 10")
+    # cursor.execute("INSERT INTO csv (name, year) VALUES (\"Mike\", 30)")
+    # cursor.execute("UPDATE csv SET name=\"Charly\",year=30 WHERE name=\"Mike\"")
+    # cursor.execute("DELETE FROM csv WHERE name=\"Charly\"")
+
     obj = cursor.fetchall()
     print(obj)
     connection.close()
@@ -55,4 +59,5 @@ def test_mongodb_connector():
 """
 
 if __name__ == '__main__':
+    # test_uri_pattern()
     test_mongodb_connector()
