@@ -18,7 +18,7 @@ def test_mongodb_connector():
     # print(result)
     # connection.close()
 
-    connection = connect("mongodb://localhost:27017/testdb")
+    connection = connect(uri="mongodb://localhost:27017/testdb")
     cursor = connection.cursor()
 
     cursor.execute("SELECT * FROM csv WHERE year >= 10")
@@ -29,6 +29,8 @@ def test_mongodb_connector():
     obj = cursor.fetchall()
     print(obj)
     connection.close()
+
+    connection = connect(host="localhost", port=27017, database="testdb")
 
     # # client = MongoClient("mongodb://localhost:27017/")
     # # collection = client["testdb"]["csv"]

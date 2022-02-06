@@ -5,6 +5,70 @@ from . lark_sql import MongoSQLParser
 class MongoDBConnectorException(Exception):
     pass
 
+class Warning(Exception):
+    pass
+
+class Error(Exception):
+    pass
+
+class InternalError(Error):
+    pass
+
+class DatabaseError(Error):
+    pass
+
+class DataError(DatabaseError):
+    pass
+
+class OperationError(DatabaseError):
+    pass
+
+class IntegrityError(DatabaseError):
+    pass
+
+class InternalError(DatabaseError):
+    pass
+
+class ProgrammingError(DatabaseError):
+    pass
+
+class NotSupportedError(DatabaseError):
+    pass
+
+"""
+
+InterfaceError
+Exception raised for errors that are related to the database interface rather than the database itself. It must be a subclass of Error.
+DatabaseError
+Exception raised for errors that are related to the database. It must be a subclass of Error.
+DataError
+Exception raised for errors that are due to problems with the processed data like division by zero, numeric value out of range, etc. It must be a subclass of DatabaseError.
+OperationalError
+Exception raised for errors that are related to the database's operation and not necessarily under the control of the programmer, e.g. an unexpected disconnect occurs, the data source name is not found, a transaction could not be processed, a memory allocation error occurred during processing, etc. It must be a subclass of DatabaseError.
+IntegrityError
+Exception raised when the relational integrity of the database is affected, e.g. a foreign key check fails. It must be a subclass of DatabaseError.
+InternalError
+Exception raised when the database encounters an internal error, e.g. the cursor is not valid anymore, the transaction is out of sync, etc. It must be a subclass of DatabaseError.
+ProgrammingError
+Exception raised for programming errors, e.g. table not found or already exists, syntax error in the SQL statement, wrong number of parameters specified, etc. It must be a subclass of DatabaseError.
+NotSupportedError
+Exception raised in case a method or database API was used which is not supported by the database, e.g. requesting a .rollback() on a connection that does not support transaction or has transactions turned off. It must be a subclass of DatabaseError.
+This is the exception inheritance layout:
+
+StandardError
+|__Warning
+|__Error
+   |__InterfaceError
+   |__DatabaseError
+      |__DataError
+      |__OperationalError
+      |__IntegrityError
+      |__InternalError
+      |__ProgrammingError
+      |__NotSupportedError
+"""
+
+
 class MongoDBCursor():
 
     arraysize = 100
@@ -19,7 +83,7 @@ class MongoDBCursor():
         print("MongoDB Cursor created")
 
     def callproc(procname, *args):
-        raise MongoDBConnectorException("Not implemented")
+        raise NotSupportedError("Not implemented")
 
     def close(self):
         self.client.close()
@@ -68,9 +132,9 @@ class MongoDBCursor():
                 collection = parsed["table"]
                 self.client[self.database][collection].drop()
             else:
-                raise MongoDBConnectorException("Not implemented")
+                raise NotSupportedError("Not implemented")
         except Exception as e:
-            raise MongoDBConnectorException("Invalid SQL statement", e)
+            raise OperationError("Invalid SQL statement", e)
 
     def executemany( self, operation, seq_of_parameter ):
         pass
@@ -134,7 +198,7 @@ class MongoDBConnection():
             try:
                 self.port = int(port)
             except Exception as e:
-                raise MongoDBConnectorException("Invalid port number", e)
+                raise ProgrammingError("Invalid port number", e)
         else:
             self.port = 27017
 
@@ -143,7 +207,7 @@ class MongoDBConnection():
         self.database = database
 
         if self.database is None:
-            raise MongoDBConnectorException("Database name is not specified")
+            raise ProgrammingError("Database name is not specified")
         
         user_pass =""
         if user is not None:
@@ -153,7 +217,7 @@ class MongoDBConnection():
         try:
             self.client = MongoClient(uri)
         except Exception as e:
-            raise MongoDBConnectorException("Invalid mongodb connection configuration", e)
+            raise ProgrammingError("Invalid mongodb connection configuration", e)
     
     def close(self):
         self.client.close()
@@ -169,16 +233,38 @@ class MongoDBConnection():
         return MongoDBCursor(self.client, self.database)
 
 
-
-def connect(uri:str)->MongoDBConnection:
+def connect(**kwargs)->MongoDBConnection:
     """Connect to MongoDB
     :param uri: MongoDB URI (e.g. mongodb://user:password@localhost:27017/db)
+    :param host: MongoDB host (e.g. localhost)
+    :param port: MongoDB port (e.g. 27017)
+    :parm username: MongoDB user name (e.g. user)
+    :param password: MongoDB password (e.g. password)
+    :param database: MongoDB database (e.g. db)
     :return: MongoDBConnection
     """
-    match = re.match(r'^mongodb://((?P<user>.*):(?P<password>.*)@)?(?P<host>.*?)(:(?P<port>[1-9][0-9]*))?/(?P<database>.*)$', uri)
-    d = match.groupdict()
-    return MongoDBConnection(d["host"], int(d["port"]), d["user"], d["password"], d["database"])
+    if "uri" in kwargs:
+        uri = kwargs["uri"]
+        match = re.match(r'^mongodb://((?P<user>.*):(?P<password>.*)@)?(?P<host>.*?)(:(?P<port>[1-9][0-9]*))?/(?P<database>.*)$', uri)
+        d = match.groupdict()
+        return MongoDBConnection(d["host"], int(d["port"]), d["user"], d["password"], d["database"])
+    else:
+        if "username" not in kwargs:
+            kwargs["username"] = None
 
+        if "password" not in kwargs:
+            kwargs["password"] = None
+        
+        if "host" not in kwargs:
+            kwargs["host"] = "localhost"
+        
+        if "port" not in kwargs:
+            kwargs["port"] = 27017
+        
+        if "database" not in kwargs:
+            kwargs["database"] = "testdb"
+
+        return MongoDBConnection(kwargs["host"], int(kwargs["port"]), kwargs["username"], kwargs["password"], kwargs["database"])
 
 
 apilevel = 2.0
