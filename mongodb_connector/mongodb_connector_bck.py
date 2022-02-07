@@ -82,13 +82,6 @@ class MongoDBCursor():
         self.parser = MongoSQLParser.get_instance()
         print("MongoDB Cursor created")
 
-        self.rowcount = -1
-        self.fetched_rows = 0
-        self._context = None
-        self.result = None
-        self.description = None
-
-
     def callproc(procname, *args):
         raise NotSupportedError("Not implemented")
 
@@ -96,24 +89,15 @@ class MongoDBCursor():
         self.client.close()
 
     def execute(self, operation, *args):
-
         print("execute", operation)
-        print("execute", type(args))
-
-        for v in args:
-            print("execute tuple", type(v))
 
         try:
-            for v in list(args):
-                print(v)
-                operation = operation.replace('?', v)
-            print("replaced operation", operation)
             parsed = self.parser.parse(operation)
             if parsed["statement"] == "select":
                 print("select")
                 collection = parsed["table"]
                 print(collection)
-                print("where option" , parsed["where"])                
+                print(parsed["where"])
                 self.cursor = self.client[self.database][collection].find(parsed["where"])
                 print("select done.")
             elif parsed["statement"] == "insert":
@@ -122,14 +106,8 @@ class MongoDBCursor():
                 k = parsed["columns"] # name, year
                 v = parsed["values"]  # mike 30
                 obj = {}
-                j = 0
                 for i in range(len(k)):
-                    if v[i] == '?':
-                        obj[k[i]] = args[0][j]
-                        j += 1
-                    else:
-                        obj[ k[i] ] = v[i]
-                print("insert value ", obj )
+                    obj[ k[i] ] = v[i]
                 self.client[self.database][collection].insert_one(obj)
                 self.cursor = None
                 print("insert done.")
@@ -165,9 +143,7 @@ class MongoDBCursor():
             raise OperationError("Invalid SQL statement", e)
 
     def executemany( self, operation, seq_of_parameter ):
-        print('executemany!!',operation)
-        for params in seq_of_parameter:
-            self.execute(self, operation, params )
+        pass
 
     def fetchone(self):
         if self.cursor is not None:
@@ -244,8 +220,6 @@ class MongoDBConnection():
             user_pass = user + ":" + password + "@"
 
         uri = "mongodb://" + user_pass + host + ":" + str(port)
-
-        print("connect uri", uri)
         try:
             self.client = MongoClient(uri)
         except Exception as e:
@@ -265,14 +239,14 @@ class MongoDBConnection():
         return MongoDBCursor(self.client, self.database)
     
     def list_tables(self):
-        print("list tables?")
+        print("list tables")
         collections = self.client[self.database].list_collection_names()
         ret = []
         for c in collections:
             ret.append(c)
         return ret
 
-def connect(*args,**kwargs)->MongoDBConnection:
+def connect(**kwargs)->MongoDBConnection:
     """Connect to MongoDB
     :param uri: MongoDB URI (e.g. mongodb://user:password@localhost:27017/db)
     :param host: MongoDB host (e.g. localhost)
@@ -288,10 +262,10 @@ def connect(*args,**kwargs)->MongoDBConnection:
         d = match.groupdict()
         return MongoDBConnection(d["host"], int(d["port"]), d["user"], d["password"], d["database"])
     else:
-        if "username" not in kwargs or kwargs["username"] == "":
+        if "username" not in kwargs:
             kwargs["username"] = None
 
-        if "password" not in kwargs or kwargs["password"] == "":
+        if "password" not in kwargs:
             kwargs["password"] = None
         
         if "host" not in kwargs:

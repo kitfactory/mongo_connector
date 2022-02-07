@@ -44,16 +44,17 @@ update_statement: UPDATE table_name SET assigns [where_clause]
 delete_statement: DELETE FROM table_name [where_clause]
 
 //CREATE TABLE (テーブル名) (列名1 型1, 列名2 型2,...)
-create_statement: CREATE TABLE table_name "(" COLUMN type ("," COLUMN type)* ")"
+create_statement: CREATE TABLE table_name "(" column_clause ")"
+
 
 //DROP TABLE (テーブル名)
 drop_statement: DROP TABLE table_name
 
-columns:  ANY | COLUMN ("," COLUMN)*
+columns:  ANY | (COLUMN [AS COLUMN])("," COLUMN [AS COLUMN])*
 values: value ("," value)*
 order_by_clause: ORDER BY COLUMN [ASC|DESC]
 where_clause: WHERE expression
-limit_clause: LIMIT INT
+limit_clause: LIMIT (INT|QUESTION)
 
 expression: and_condition [OR and_condition]
 and_condition: condition (AND condition)*
@@ -62,19 +63,30 @@ compare: term COMPARE term
 
 assigns: (COLUMN "=" value) ("," COLUMN "=" value)*
 
-value: SIGNED_INT | SIGNED_FLOAT | STRING  |NULL | boolean
+column_with_type: COLUMN type [constraint]
+column_clause:(column_with_type) ((",")((primary_key)|(column_with_type)))*
+
+constraint: (NOT NULL)|(UNIQUE)
+primary_key.5: PRIMARY KEY "(" COLUMN ")"
+
+
+value: SIGNED_INT | SIGNED_FLOAT | STRING  |NULL | boolean | QUESTION
 term: value | COLUMN
 boolean: TRUE | FALSE
 TRUE.2: "true"|"True"|"TRUE"
 FALSE.3: "false"|"False"|"FALSE"
 NULL.5: "NULL"|"null"|"Null"
 
-
 //終端記号
+PRIMARY.15: "PRIMARY"|"primary"
+KEY.7: "KEY"|"key"
 table_name: WORD
 ANY.10: "*"
 COLUMN.1: WORD
 STRING: ESCAPED_STRING
+QUESTION.4: "?"
+AS : "AS"|"as"
+AS_COLUMN: WORD
 
 SELECT: "SELECT"|"select"
 FROM: "FROM"|"from"
@@ -97,14 +109,15 @@ COMPARE:"<>"|"<="|">="|"<"|">"|"="|"!="
 CREATE: "CREATE"|"create"
 DROP: "DROP"|"drop"
 TABLE: "TABLE"|"table"
+UNIQUE: "UNIQUE"|"unique"
 
-type:  TYPE_BOOLEAN| TYPE_INT | TYPE_DECIMAL | TYPE_VARCHAR | TYPE_TIME
+type:  TYPE_BOOLEAN| TYPE_INTEGER | TYPE_DECIMAL | TYPE_VARCHAR | TYPE_TIME
 
-// 型情報　ただし使われません
+// 型情報
 TYPE_BOOLEAN: "BOOLEAN"|"boolean"
-TYPE_INT: "INT"|"int"
+TYPE_INTEGER: "INTEGER"|"int"
 TYPE_DECIMAL: "DECIMAL"|"decimal"
-TYPE_VARCHAR: "VARCHAR"|"varchar"
+TYPE_VARCHAR: ("VARCHAR"|"varchar")["(" SIGNED_INT")"]
 TYPE_TIME: "TIME"|"time"
 
 // サポートできていないもの
@@ -114,12 +127,17 @@ TYPE_TIME: "TIME"|"time"
 // BETWEEN: "BETWEEN"|"between"
 // JOIN: "JOIN"|"join"
 
+LCASE_LETTER: "a".."z"
+UCASE_LETTER: "A".."Z"
+LETTER: UCASE_LETTER | LCASE_LETTER | "." | "_"
+WORD: LETTER+
+
 //共通記号
 %import common.ESCAPED_STRING
 %import common.SIGNED_FLOAT
 %import common.SIGNED_INT
 %import common.INT
-%import common.WORD
+// %import common.WORD
 %import common.WS
 %ignore WS
 '''
@@ -338,7 +356,33 @@ class SQLTransformer(Transformer):
         print("Create statement",parsed)
         ret = {
             "statement": "create",
-            "table": parsed[2]
+            "table": parsed[2],
+            "columns": parsed[3]
+        }
+        return ret
+
+    def column_clause(self, tokens):
+        return tokens
+
+    def column_with_type(self, parsed):
+        print("Column with type", parsed)
+        ret ={
+            "name": parsed[0].value,
+        }
+        if parsed[1].children[0].type == 'TYPE_VARCHAR':
+            ret["type"] = "varchar"
+        elif parsed[1].children[0].type == 'TYPE_INTEGER':
+            ret["type"] = "integer"
+        elif parsed[1].children[0].type == 'TYPE_DECIMAL':
+            ret["type"]= "decimal"
+        elif parsed[1].children[0].type == 'TYPE_BOOLEAN':
+            ret["type"] = "boolean"
+        return ret
+    
+    def primary_key(self,parsed):
+        print("primary key ", parsed)
+        ret = {
+            "primary_key": parsed[2].value
         }
         return ret
 
@@ -423,13 +467,14 @@ if __name__ == "__main__":
     # print(parser.parse('DELETE FROM hoge WHERE x > 10'))
 
     # # update
-    print(parser.parse('UPDATE hoge SET a=19, b=20, c=30 WHERE x > 20'))
+    # print(parser.parse('UPDATE hoge SET a=19, b=20, c=30 WHERE x > 20'))
 
     # create table
-    # print(p.parse('CREATE TABLE hoge (a INT, b INT, c INT)'))
+    print(parser.parse('CREATE TABLE furit (id INTEGER NOT NULL, name VARCHAR(255), PRIMARY KEY(id))'))
 
     # drop table
     # print(p.parse('DROP TABLE hoge'))
     # https://docs.mongodb.com/manual/reference/method/db.collection.drop/
 
 
+    

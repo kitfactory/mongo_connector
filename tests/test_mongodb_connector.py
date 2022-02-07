@@ -21,16 +21,17 @@ def test_mongodb_connector():
     connection = connect(uri="mongodb://localhost:27017/testdb")
     cursor = connection.cursor()
 
-    cursor.execute("SELECT * FROM csv WHERE year >= 10")
+    # cursor.execute("SELECT * FROM csv WHERE year >= 10")
     # cursor.execute("INSERT INTO csv (name, year) VALUES (\"Mike\", 30)")
     # cursor.execute("UPDATE csv SET name=\"Charly\",year=30 WHERE name=\"Mike\"")
     # cursor.execute("DELETE FROM csv WHERE name=\"Charly\"")
+    # cursor.execute("CREATE TABLE fruit (id INTEGER, name VARCHAR(255), PRIMARY KEY(id))")
 
-    obj = cursor.fetchall()
-    print(obj)
+    # obj = cursor.fetchall()
+    # print(obj)
     connection.close()
 
-    connection = connect(host="localhost", port=27017, database="testdb")
+    # connection = connect(host="localhost", port=27017, database="testdb")
 
     # # client = MongoClient("mongodb://localhost:27017/")
     # # collection = client["testdb"]["csv"]
